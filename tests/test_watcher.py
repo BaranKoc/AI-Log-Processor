@@ -2,6 +2,7 @@ import asyncio
 import json
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -74,10 +75,6 @@ class TestProcessLogFile:
 class TestLogFileHandler:
     """Tests that the watchdog handler only reacts to .json file creation events."""
 
-    def test_handler_has_on_created(self):
-        handler = LogFileHandler(db_path="dummy.db", loop=asyncio.new_event_loop())
-        assert hasattr(handler, "on_created")
-
     def test_handler_stores_db_path_and_loop(self):
         loop = asyncio.new_event_loop()
         handler = LogFileHandler(db_path="test.db", loop=loop)
@@ -85,9 +82,36 @@ class TestLogFileHandler:
         assert handler.loop is loop
         loop.close()
 
+    def test_on_created_triggers_for_json_file(self):
+        loop = asyncio.new_event_loop()
+        handler = LogFileHandler(db_path="dummy.db", loop=loop)
+        event = type("Event", (), {"src_path": "/tmp/new_log.json", "is_directory": False})()
+        with patch("src.watcher.asyncio.run_coroutine_threadsafe") as mock_bridge:
+            handler.on_created(event)
+            mock_bridge.assert_called_once()
+        loop.close()
+
+    def test_on_created_ignores_non_json_file(self):
+        loop = asyncio.new_event_loop()
+        handler = LogFileHandler(db_path="dummy.db", loop=loop)
+        event = type("Event", (), {"src_path": "/tmp/readme.txt", "is_directory": False})()
+        with patch("src.watcher.asyncio.run_coroutine_threadsafe") as mock_bridge:
+            handler.on_created(event)
+            mock_bridge.assert_not_called()
+        loop.close()
+
+    def test_on_created_ignores_directories(self):
+        loop = asyncio.new_event_loop()
+        handler = LogFileHandler(db_path="dummy.db", loop=loop)
+        event = type("Event", (), {"src_path": "/tmp/subdir", "is_directory": True})()
+        with patch("src.watcher.asyncio.run_coroutine_threadsafe") as mock_bridge:
+            handler.on_created(event)
+            mock_bridge.assert_not_called()
+        loop.close()
+
 
 class TestStartWatcher:
-    """Tests that start_watcher creates and returns an observer monitoring the directory."""
+    """Tests that start_watcher creates and returns a running observer."""
 
     def test_watcher_starts_and_stops(self, tmp_path):
         loop = asyncio.new_event_loop()
@@ -96,13 +120,4 @@ class TestStartWatcher:
         observer.stop()
         observer.join(timeout=2)
         assert not observer.is_alive()
-        loop.close()
-
-    def test_watcher_targets_correct_directory(self, tmp_path):
-        loop = asyncio.new_event_loop()
-        observer = start_watcher(str(tmp_path), "dummy.db", loop)
-        # observer._watches contains the scheduled paths
-        assert observer.is_alive()
-        observer.stop()
-        observer.join(timeout=2)
         loop.close()
