@@ -3,6 +3,7 @@ import json
 import logging
 from pathlib import Path
 
+import src.config as config
 from pydantic import ValidationError
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -17,18 +18,17 @@ logger = logging.getLogger(__name__)
 
 class LogFileHandler(FileSystemEventHandler):
 
-    def __init__(self, db_path: str, loop: asyncio.AbstractEventLoop):
+    def __init__(self, loop: asyncio.AbstractEventLoop):
         super().__init__()
-        self.db_path = db_path
         self.loop = loop
 
-    def on_created(self, event):
+    def on_created(self, event) -> None:
         if event.is_directory:
             return
         if not event.src_path.endswith(".json"):
             return
         asyncio.run_coroutine_threadsafe(
-            process_log_file(event.src_path, self.db_path),
+            process_log_file(event.src_path),
             self.loop,
         )
 
@@ -37,7 +37,7 @@ class LogFileHandler(FileSystemEventHandler):
 
 # region Core Functions
 
-async def process_log_file(file_path: str, db_path: str):
+async def process_log_file(file_path: str) -> None:
     path = Path(file_path)
     if path.suffix != ".json":
         return
@@ -54,13 +54,13 @@ async def process_log_file(file_path: str, db_path: str):
         logger.warning("Schema validation failed for %s: %s", file_path, exc)
         return
 
-    await ship_log(db_path, log)
+    await ship_log(log)
 
 
-def start_watcher(watch_dir: str, db_path: str, loop: asyncio.AbstractEventLoop) -> any:
-    handler = LogFileHandler(db_path=db_path, loop=loop)
+def start_watcher(loop: asyncio.AbstractEventLoop) -> Observer:
+    handler = LogFileHandler(loop=loop)
     observer = Observer()
-    observer.schedule(handler, watch_dir, recursive=False)
+    observer.schedule(handler, config.LOGS_DIR, recursive=False)
     observer.start()
     return observer
 
