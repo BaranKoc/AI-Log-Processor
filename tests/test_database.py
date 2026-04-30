@@ -11,7 +11,7 @@ async def setup_db(tmp_path):
     config.set_db_path(str(tmp_path / "test_logs.db"))
     await init_db()
     yield
-    config.set_db_path("data/logs.db")
+    config.restore_defaults()
 
 
 class TestDatabaseInit:
@@ -22,14 +22,14 @@ class TestDatabaseInit:
         config.set_db_path(str(path))
         await init_db()
         assert path.exists()
-        config.set_db_path("data/logs.db")
+        config.restore_defaults()
 
     async def test_init_is_idempotent(self, tmp_path):
         path = tmp_path / "new.db"
         config.set_db_path(str(path))
         await init_db()
         await init_db()  # should not raise
-        config.set_db_path("data/logs.db")
+        config.restore_defaults()
 
 
 class TestInsertLog:

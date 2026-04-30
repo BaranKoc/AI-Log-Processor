@@ -15,7 +15,7 @@ async def setup_db(tmp_path):
     config.set_db_path(str(tmp_path / "test_shipper.db"))
     await init_db()
     yield
-    config.set_db_path("data/logs.db")
+    config.restore_defaults()
 
 
 def make_log(message: str = "test", level: str = "INFO") -> LogEntry:

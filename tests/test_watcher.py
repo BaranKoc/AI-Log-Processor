@@ -32,7 +32,7 @@ async def setup_db(tmp_path):
     config.set_db_path(str(tmp_path / "test_watcher.db"))
     await init_db()
     yield
-    config.set_db_path("data/logs.db")
+    config.restore_defaults()
 
 
 class TestProcessLogFile:
@@ -124,4 +124,4 @@ class TestStartWatcher:
         observer.join(timeout=2)
         assert not observer.is_alive()
         loop.close()
-        config.set_logs_dir("logs")
+        config.restore_defaults()
